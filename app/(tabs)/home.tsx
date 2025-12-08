@@ -1,6 +1,7 @@
 import { View, Text, FlatList, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import FoodCard from "../../components/FoodCard";
 
 const MOCK_DATA = [
@@ -37,6 +38,7 @@ const MOCK_DATA = [
 ];
 
 export default function HomeScreen() {
+    const router = useRouter();
     return (
         <SafeAreaView className="flex-1 bg-gray-50 p-4 pb-0">
             <View className="flex-row justify-between items-center mb-6">
@@ -68,7 +70,26 @@ export default function HomeScreen() {
                         price={item.price}
                         image={item.image}
                         rating={item.rating}
-                        onPress={() => { }}
+                        onPress={() => {
+
+                            // Handle passing local asset (number) vs remote URL (string) to params
+                            let imageParam = item.image;
+                            if (typeof item.image === 'number') {
+                                imageParam = item.image.toString();
+                            }
+
+                            router.push({
+                                pathname: "/food-detail/[id]",
+                                params: {
+                                    id: item.id,
+                                    title: item.title,
+                                    chef: item.chef,
+                                    price: item.price,
+                                    image: imageParam,
+                                    maxQuantity: "10" // Mock availability
+                                }
+                            });
+                        }}
                     />
                 )}
                 showsVerticalScrollIndicator={false}
