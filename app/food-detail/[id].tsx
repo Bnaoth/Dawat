@@ -1,14 +1,15 @@
-import { View, Text, Image, TouchableOpacity, ScrollView, Alert } from "react-native";
+import { View, Text, Image, TouchableOpacity, ScrollView, Alert, FlatList, Dimensions, Animated } from "react-native";
 import { useGlobalSearchParams, router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Slider from '@react-native-community/slider';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Helper to resolve image source from params (handling require vs uri string)
 const resolveImage = (imgParam: string | any) => {
     if (!imgParam) return { uri: 'https://placehold.co/600x400' };
-    // If it's a number, it's a local require() asset ID passed as string, or just a number
     if (!isNaN(Number(imgParam))) {
         return Number(imgParam);
     }
@@ -30,6 +31,29 @@ export default function FoodDetailScreen() {
     const maxQty = isNaN(parsedMax) ? DEFAULT_MAX : parsedMax;
 
     const [quantity, setQuantity] = useState(1);
+    const [ingredientsExpanded, setIngredientsExpanded] = useState(false);
+    const [activeSlide, setActiveSlide] = useState(0);
+
+    // Use local assets as requested by user
+    const carouselImages = [
+        require('../../assets/food/img1.png'),
+        require('../../assets/food/img2.png'),
+        require('../../assets/food/img3.png'),
+        require('../../assets/food/img4.png')
+    ];
+
+    const mockIngredients = [
+        "Fresh Basmati Rice",
+        "Organic Chicken Breast",
+        "Saffron Strands",
+        "Greek Yogurt",
+        "Garam Masala Blend",
+        "Caramelized Onions",
+        "Green Cardamom",
+        "Desi Ghee",
+        "Fresh Coriander",
+        "Mint Leaves"
+    ];
 
     // Calculations
     const totalAmount = numericPrice * quantity;
@@ -53,6 +77,16 @@ export default function FoodDetailScreen() {
         );
     };
 
+    const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
+        if (viewableItems.length > 0) {
+            setActiveSlide(viewableItems[0].index ?? 0);
+        }
+    }).current;
+
+    const viewabilityConfig = useRef({
+        itemVisiblePercentThreshold: 50
+    }).current;
+
     return (
         <SafeAreaView className="flex-1 bg-white">
             {/* Header with Back Button */}
@@ -65,15 +99,39 @@ export default function FoodDetailScreen() {
                 </TouchableOpacity>
             </View>
 
-            <ScrollView className="flex-1">
-                {/* Image Section */}
-                <Image
-                    source={resolveImage(image)}
-                    className="w-full h-72 bg-gray-200"
-                    resizeMode="cover"
-                />
+            <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+                {/* Image Carousel */}
+                <View className="relative">
+                    <FlatList
+                        data={carouselImages}
+                        renderItem={({ item }) => (
+                            <Image
+                                source={item}
+                                style={{ width: SCREEN_WIDTH, height: 320 }}
+                                resizeMode="cover"
+                            />
+                        )}
+                        horizontal
+                        pagingEnabled
+                        showsHorizontalScrollIndicator={false}
+                        onViewableItemsChanged={onViewableItemsChanged}
+                        viewabilityConfig={viewabilityConfig}
+                        keyExtractor={(_, index) => index.toString()}
+                    />
+
+                </View>
 
                 <View className="p-6 -mt-6 bg-white rounded-t-3xl shadow-lg">
+                    {/* Pagination Dots (Moved here for visibility) */}
+                    <View className="flex-row justify-center items-center space-x-2 mb-6">
+                        {carouselImages.map((_, index) => (
+                            <View
+                                key={index}
+                                className={`rounded-full ${index === activeSlide ? 'w-5 h-2.5 bg-red-600' : 'w-2 h-2 bg-red-300'}`}
+                            />
+                        ))}
+                    </View>
+
                     {/* Title & Price */}
                     <View className="flex-row justify-between items-start mb-2">
                         <View className="flex-1 pr-4">
@@ -81,6 +139,33 @@ export default function FoodDetailScreen() {
                             <Text className="text-gray-500 font-medium mt-1">by Chef {chef}</Text>
                         </View>
                         <Text className="text-2xl font-bold text-orange-600">£{numericPrice}</Text>
+                    </View>
+
+                    {/* Ingredients Section */}
+                    <View className="mt-6 mb-2 border border-gray-100 rounded-xl overflow-hidden">
+                        <TouchableOpacity
+                            onPress={() => setIngredientsExpanded(!ingredientsExpanded)}
+                            className="flex-row justify-between items-center p-4 bg-gray-50"
+                        >
+                            <Text className="text-lg font-bold text-gray-800">Ingredients</Text>
+                            <Ionicons
+                                name={ingredientsExpanded ? "chevron-up" : "chevron-down"}
+                                size={20}
+                                color="#4B5563"
+                            />
+                        </TouchableOpacity>
+
+                        {ingredientsExpanded && (
+                            <View className="p-4 bg-white">
+                                <View className="flex-row flex-wrap gap-2">
+                                    {mockIngredients.map((ingredient, index) => (
+                                        <View key={index} className="bg-orange-50 px-3 py-1.5 rounded-full border border-orange-100">
+                                            <Text className="text-orange-800 text-sm font-medium">{ingredient}</Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            </View>
+                        )}
                     </View>
 
                     <View className="h-px bg-gray-100 my-6" />
