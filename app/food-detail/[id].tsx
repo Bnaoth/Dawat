@@ -20,7 +20,7 @@ export default function FoodDetailScreen() {
 
     const params = useGlobalSearchParams();
 
-    const { id, title, chef, price, image, maxQuantity = "10" } = params;
+    const { id, title, chef, price, image, maxQuantity = "10", ingredients } = params;
 
     // Parse price (remove currency symbol)
     const numericPrice = parseFloat((price as string).replace('£', ''));
@@ -42,17 +42,8 @@ export default function FoodDetailScreen() {
         require('../../assets/food/img4.png')
     ];
 
-    const mockIngredients = [
-        "Fresh Basmati Rice",
-        "Organic Chicken Breast",
-        "Saffron Strands",
-        "Greek Yogurt",
-        "Garam Masala Blend",
-        "Caramelized Onions",
-        "Green Cardamom",
-        "Desi Ghee",
-        "Fresh Coriander",
-        "Mint Leaves"
+    const ingredientsList = ingredients ? JSON.parse(ingredients as string) : [
+        "Fresh Basmati Rice", "Organic Chicken Breast", "Saffron" // Fallback
     ];
 
     // Calculations
@@ -158,7 +149,7 @@ export default function FoodDetailScreen() {
                         {ingredientsExpanded && (
                             <View className="p-4 bg-white">
                                 <View className="flex-row flex-wrap gap-2">
-                                    {mockIngredients.map((ingredient, index) => (
+                                    {ingredientsList.map((ingredient: string, index: number) => (
                                         <View key={index} className="bg-orange-50 px-3 py-1.5 rounded-full border border-orange-100">
                                             <Text className="text-orange-800 text-sm font-medium">{ingredient}</Text>
                                         </View>

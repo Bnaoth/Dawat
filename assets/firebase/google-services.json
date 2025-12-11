@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "115934389920",
+    "project_id": "dawat-26b66",
+    "storage_bucket": "dawat-26b66.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:115934389920:android:ec3b1fe8f26db7303e8bc5",
+        "android_client_info": {
+          "package_name": "com.Aadhya.Dawat"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAYPSVWLDjthitZTWJ7SA5WeXUdNEU6Was"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
