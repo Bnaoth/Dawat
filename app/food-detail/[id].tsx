@@ -1,9 +1,12 @@
-import { View, Text, Image, TouchableOpacity, ScrollView, Alert, FlatList, Dimensions, Animated } from "react-native";
+import { View, Text, Image, TouchableOpacity, ScrollView, Alert, FlatList, Dimensions, Animated, Modal } from "react-native";
 import { useGlobalSearchParams, router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useState, useRef } from "react";
 import Slider from '@react-native-community/slider';
+import { useDispatch, useSelector } from "react-redux";
+import { AppDispatch, RootState } from "../../store/store";
+import { createOrder } from "../../store/slices/ordersSlice";
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -19,8 +22,11 @@ const resolveImage = (imgParam: string | any) => {
 export default function FoodDetailScreen() {
 
     const params = useGlobalSearchParams();
+    const dispatch = useDispatch<AppDispatch>();
+    const user = useSelector((state: RootState) => state.user);
+    const { loading } = useSelector((state: RootState) => state.orders);
 
-    const { id, title, chef, price, image, maxQuantity = "10", ingredients } = params;
+    const { id, title, chef, price, image, maxQuantity = "10", ingredients, supplierId = "supplier_123" } = params;
 
     // Parse price (remove currency symbol)
     const numericPrice = parseFloat((price as string).replace('£', ''));
@@ -33,6 +39,8 @@ export default function FoodDetailScreen() {
     const [quantity, setQuantity] = useState(1);
     const [ingredientsExpanded, setIngredientsExpanded] = useState(false);
     const [activeSlide, setActiveSlide] = useState(0);
+    const [showPasscodeModal, setShowPasscodeModal] = useState(false);
+    const [generatedPasscode, setGeneratedPasscode] = useState('');
 
     // Use local assets as requested by user
     const carouselImages = [
@@ -52,21 +60,26 @@ export default function FoodDetailScreen() {
     const totalAmount = subtotal; // Customer pays list price
     const chefShare = Math.max(0, subtotal - platformFee); // Deducted from chef
 
-    const handleCheckout = () => {
-        Alert.alert(
-            "Confirm Order",
-            `Pay £${totalAmount.toFixed(2)} for ${quantity} items?`,
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Pay Now",
-                    onPress: () => {
-                        Alert.alert("Success", "Order placed! Enjoy your Dawat.");
-                        router.back();
-                    }
-                }
-            ]
-        );
+    const handleCheckout = async () => {
+        try {
+            const result = await dispatch(createOrder({
+                customerId: user.firstName || "customer_123",
+                customerName: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : "Customer",
+                customerPostcode: user.postcode,
+                supplierId: supplierId as string,
+                supplierName: chef as string,
+                postId: id as string,
+                postTitle: title as string,
+                quantity,
+                pricePerItem: price as string,
+            })).unwrap();
+
+            // Show passcode modal with generated code
+            setGeneratedPasscode(result.passcode);
+            setShowPasscodeModal(true);
+        } catch (error) {
+            Alert.alert("Error", "Failed to create order. Please try again.");
+        }
     };
 
     const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
@@ -216,12 +229,72 @@ export default function FoodDetailScreen() {
                     {/* Checkout Button */}
                     <TouchableOpacity
                         onPress={handleCheckout}
-                        className="w-full bg-orange-600 py-4 rounded-xl items-center shadow-md active:bg-orange-700"
+                        disabled={loading}
+                        className={`w-full bg-orange-600 py-4 rounded-xl items-center shadow-md active:bg-orange-700 ${loading ? 'opacity-50' : ''}`}
                     >
-                        <Text className="text-white font-bold text-xl">Checkout • £{totalAmount.toFixed(2)}</Text>
+                        <Text className="text-white font-bold text-xl">
+                            {loading ? "Processing..." : `Checkout • £${totalAmount.toFixed(2)}`}
+                        </Text>
                     </TouchableOpacity>
                 </View>
             </ScrollView>
+
+            {/* Passcode Modal */}
+            <Modal
+                visible={showPasscodeModal}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setShowPasscodeModal(false)}
+            >
+                <View className="flex-1 bg-black/50 justify-center items-center p-6">
+                    <View className="bg-white rounded-3xl p-8 w-full max-w-sm">
+                        <View className="items-center mb-6">
+                            <View className="bg-green-100 p-4 rounded-full mb-4">
+                                <Ionicons name="checkmark-circle" size={48} color="#16A34A" />
+                            </View>
+                            <Text className="text-2xl font-bold text-gray-900 mb-2">Order Placed!</Text>
+                            <Text className="text-gray-500 text-center">
+                                Your order has been sent to {chef}
+                            </Text>
+                        </View>
+
+                        <View className="bg-orange-50 p-6 rounded-2xl border-2 border-orange-200 mb-6">
+                            <Text className="text-gray-700 text-center text-sm mb-2 font-medium">
+                                Collection Passcode
+                            </Text>
+                            <Text className="text-5xl font-bold text-orange-600 text-center tracking-widest">
+                                {generatedPasscode}
+                            </Text>
+                            <Text className="text-gray-500 text-center text-xs mt-3">
+                                Share this code when collecting your order
+                            </Text>
+                        </View>
+
+                        <View className="bg-gray-50 p-4 rounded-xl mb-6">
+                            <View className="flex-row items-center gap-2 mb-2">
+                                <Ionicons name="information-circle" size={16} color="#6B7280" />
+                                <Text className="text-gray-700 font-semibold text-sm">Next Steps:</Text>
+                            </View>
+                            <Text className="text-gray-600 text-xs leading-5">
+                                1. Wait for the chef to confirm order is ready{'\n'}
+                                2. Go to pickup location: {user.location}{'\n'}
+                                3. Provide passcode: {generatedPasscode}{'\n'}
+                                4. Enjoy your meal!
+                            </Text>
+                        </View>
+
+                        <TouchableOpacity
+                            onPress={() => {
+                                setShowPasscodeModal(false);
+                                router.back();
+                            }}
+                            className="bg-orange-600 py-4 rounded-xl items-center"
+                        >
+                            <Text className="text-white font-bold text-lg">Got It!</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }

@@ -17,6 +17,12 @@ export interface Post {
     quantity: string;
     rating: number;
     location: string;
+    ingredients?: string[];
+    // Supplier location data
+    supplierId?: string;
+    supplierPostcode?: string;
+    supplierLat?: number;
+    supplierLng?: number;
     createdAt?: number; // serialized timestamp
 }
 
@@ -36,14 +42,25 @@ const initialState: FeedState = {
 export const fetchPosts = createAsyncThunk('feed/fetchPosts', async () => {
     const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
     const querySnapshot = await getDocs(q);
+    
+    // Filter threshold: 5 hours (average of 4-6 hours)
+    const HOURS_THRESHOLD = 5;
+    const now = Date.now();
+    const thresholdTime = now - (HOURS_THRESHOLD * 60 * 60 * 1000);
+    
     const posts: Post[] = [];
     querySnapshot.forEach((doc) => {
         const data = doc.data();
-        posts.push({
-            id: doc.id,
-            ...data,
-            createdAt: data.createdAt?.toMillis() || Date.now()
-        } as Post);
+        const postTime = data.createdAt?.toMillis() || Date.now();
+        
+        // Only include posts created within the last 5 hours
+        if (postTime >= thresholdTime) {
+            posts.push({
+                id: doc.id,
+                ...data,
+                createdAt: postTime
+            } as Post);
+        }
     });
     return posts;
 });
@@ -56,22 +73,10 @@ export const addNewPost = createAsyncThunk(
         // Bypassing Firebase Auth, Storage, and Firestore completely due to network/env issues.
         // This processes the post purely effectively in Redux.
 
-        // Ensure Auth for Storage Rules
-        // try {
-        //     if (!auth.currentUser) {
-        //         console.log("Attempting anonymous sign-in...");
-        //         await signInAnonymously(auth);
-        //         console.log("Signed in anonymously:", auth.currentUser?.uid);
-        //     }
-        // } catch (authError: any) {
-        //     console.error("Auth Error:", authError);
-        //     throw new Error(`Authentication failed: ${authError.message}`);
-        // }
-
         // 1. Use Local Images
         const imageUrls = postData.localImages;
 
-        // 2. Create Mock Post Object
+        // 2. Create Mock Post Object with supplier location data
         const newPost: Post = {
             id: `local_${Date.now()}`,
             title: postData.title,
@@ -81,33 +86,19 @@ export const addNewPost = createAsyncThunk(
             price: postData.price,
             image: imageUrls[0],
             allImages: imageUrls,
-            ingredients: postData.ingredients || [],
+            ingredients: (postData as any).ingredients || [],
             quantity: postData.quantity,
             rating: 5.0,
             location: postData.location,
+            supplierId: (postData as any).supplierId,
+            supplierPostcode: postData.supplierPostcode,
+            supplierLat: postData.supplierLat,
+            supplierLng: postData.supplierLng,
             createdAt: Date.now(),
         };
 
         // Simulate network delay for better UX
         await new Promise(resolve => setTimeout(resolve, 500));
-
-        // 2. Create Doc
-        // const newPost = {
-        //     title: postData.title,
-        //     chef: postData.chef,
-        //     chefAvatar: postData.chefAvatar,
-        //     distance: postData.distance,
-        //     price: postData.price,
-        //     image: imageUrls[0],
-        //     allImages: imageUrls,
-        //     ingredients: postData.ingredients || [],
-        //     quantity: postData.quantity,
-        //     rating: 5.0,
-        //     location: postData.location,
-        //     createdAt: serverTimestamp(),
-        // };
-
-        // const docRef = await addDoc(collection(db, 'posts'), newPost);
 
         // Return serializable data for Redux state
         return newPost;
@@ -117,7 +108,14 @@ export const addNewPost = createAsyncThunk(
 export const feedSlice = createSlice({
     name: 'feed',
     initialState,
-    reducers: {},
+    reducers: {
+        updatePostRating: (state, action: PayloadAction<{ postId: string; newRating: number }>) => {
+            const post = state.posts.find(p => p.id === action.payload.postId);
+            if (post) {
+                post.rating = action.payload.newRating;
+            }
+        },
+    },
     extraReducers: (builder) => {
         builder
             // Fetch Posts
@@ -126,7 +124,28 @@ export const feedSlice = createSlice({
             })
             .addCase(fetchPosts.fulfilled, (state, action) => {
                 state.loading = false;
-                state.posts = action.payload;
+                
+                // Filter threshold: 5 hours
+                const HOURS_THRESHOLD = 5;
+                const now = Date.now();
+                const thresholdTime = now - (HOURS_THRESHOLD * 60 * 60 * 1000);
+                
+                // Get existing posts that are still fresh
+                const freshExistingPosts = state.posts.filter(post => 
+                    post.createdAt && post.createdAt >= thresholdTime
+                );
+                
+                // Merge: new posts from Firebase + fresh existing posts (avoiding duplicates)
+                const newPosts = action.payload;
+                const existingIds = new Set(freshExistingPosts.map(p => p.id));
+                
+                // Add new posts that don't exist in existing fresh posts
+                const uniqueNewPosts = newPosts.filter(post => !existingIds.has(post.id));
+                
+                // Combine and sort by createdAt (newest first)
+                state.posts = [...uniqueNewPosts, ...freshExistingPosts].sort((a, b) => 
+                    (b.createdAt || 0) - (a.createdAt || 0)
+                );
             })
             .addCase(fetchPosts.rejected, (state, action) => {
                 state.loading = false;
@@ -147,5 +166,7 @@ export const feedSlice = createSlice({
             });
     },
 });
+
+export const { updatePostRating } = feedSlice.actions;
 
 export default feedSlice.reducer;

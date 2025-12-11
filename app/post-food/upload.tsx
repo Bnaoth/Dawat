@@ -1,11 +1,12 @@
 import { View, Text, TouchableOpacity, ScrollView, Image, Alert, TextInput, ActivityIndicator, Modal, FlatList, SafeAreaView } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "../../store/store";
 import { addNewPost } from "../../store/slices/feedSlice";
+import { geocodePostcode } from "../../utils/locationUtils";
 
 const QUANTITY_OPTIONS = Array.from({ length: 100 }, (_, i) => String(i + 1));
 const PRICE_OPTIONS = ["Free", ...Array.from({ length: 40 }, (_, i) => `£${(i + 1) * 0.50 ? ((i + 1) * 0.50).toFixed(2) : ""}`)];
@@ -21,6 +22,7 @@ export default function UploadScreen() {
     const [images, setImages] = useState<string[]>([]);
     const [quantity, setQuantity] = useState("1");
     const [price, setPrice] = useState("Free");
+    const [geocodingLocation, setGeocodingLocation] = useState(false);
 
     // Manage which picker is open: 'quantity' | 'price' | null
     const [activePicker, setActivePicker] = useState<string | null>(null);
@@ -47,18 +49,36 @@ export default function UploadScreen() {
         try {
             const ingredientsList = params.ingredients ? JSON.parse(params.ingredients as string) : [];
 
+            // Geocode supplier's postcode to get coordinates for distance calculation
+            let supplierLat: number | undefined;
+            let supplierLng: number | undefined;
+
+            if (user.postcode) {
+                setGeocodingLocation(true);
+                const coords = await geocodePostcode(user.postcode);
+                if (coords) {
+                    supplierLat = coords.lat;
+                    supplierLng = coords.lng;
+                }
+                setGeocodingLocation(false);
+            }
+
             await dispatch(addNewPost({
                 title: (params.category as string) || "Delicious Food",
-                chef: "Ganesh",
+                chef: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : "Chef",
                 chefAvatar: user.avatar,
-                distance: "0.2 miles",
+                distance: "Calculating...",
                 price: price, // Use selected price
                 localImages: images,
                 ingredients: ingredientsList,
                 quantity: `${quantity} Plates`, // appending unit for display
                 rating: 5.0,
-                location: user.location
-            })).unwrap();
+                location: user.address || user.location,
+                supplierId: user.firstName || "supplier_default",
+                supplierPostcode: user.postcode, // Store supplier's postcode
+                supplierLat: supplierLat, // Store geocoded lat
+                supplierLng: supplierLng, // Store geocoded lng
+            } as any)).unwrap();
 
             Alert.alert(
                 "Success!",
@@ -149,10 +169,10 @@ export default function UploadScreen() {
             {/* 3. Post Button (Bottom) */}
             <TouchableOpacity
                 onPress={handleSubmit}
-                className={`w-full bg-orange-600 rounded-xl p-4 items-center justify-center shadow-sm mb-6 ${images.length === 0 || loading ? 'opacity-50' : ''}`}
-                disabled={images.length === 0 || loading}
+                className={`w-full bg-orange-600 rounded-xl p-4 items-center justify-center shadow-sm mb-6 ${(images.length === 0 || loading || geocodingLocation) ? 'opacity-50' : ''}`}
+                disabled={images.length === 0 || loading || geocodingLocation}
             >
-                {loading ? (
+                {loading || geocodingLocation ? (
                     <ActivityIndicator color="white" />
                 ) : (
                     <Text className="text-white font-bold text-lg">Post Food</Text>
