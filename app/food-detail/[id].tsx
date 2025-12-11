@@ -47,9 +47,10 @@ export default function FoodDetailScreen() {
     ];
 
     // Calculations
-    const totalAmount = numericPrice * quantity;
-    const adminShare = totalAmount * 0.10; // 10%
-    const chefShare = totalAmount * 0.90;  // 90%
+    const subtotal = numericPrice * quantity;
+    const platformFee = 0.30; // Flat 30p platform fee
+    const totalAmount = subtotal; // Customer pays list price
+    const chefShare = Math.max(0, subtotal - platformFee); // Deducted from chef
 
     const handleCheckout = () => {
         Alert.alert(
@@ -190,13 +191,15 @@ export default function FoodDetailScreen() {
                             <Text className="text-gray-600">Total Price</Text>
                             <Text className="font-bold text-gray-900">£{totalAmount.toFixed(2)}</Text>
                         </View>
+
                         <View className="h-px bg-gray-200 my-2" />
 
-                        {/* Visual Split for User Knowledge (as requested) */}
+                        <Text className="text-xs text-gray-400 mb-2">How this is distributed:</Text>
+
                         <View className="flex-row justify-between items-center">
                             <View className="flex-row items-center gap-1">
                                 <Ionicons name="restaurant" size={12} color="#16A34A" />
-                                <Text className="text-xs text-green-700">Chef receives (90%)</Text>
+                                <Text className="text-xs text-green-700">Chef (Net)</Text>
                             </View>
                             <Text className="text-xs font-bold text-green-700">£{chefShare.toFixed(2)}</Text>
                         </View>
@@ -204,9 +207,9 @@ export default function FoodDetailScreen() {
                         <View className="flex-row justify-between items-center mt-1">
                             <View className="flex-row items-center gap-1">
                                 <Ionicons name="shield-checkmark" size={12} color="#6B7280" />
-                                <Text className="text-xs text-gray-500">Platform fee (10%)</Text>
+                                <Text className="text-xs text-gray-500">Platform Fee</Text>
                             </View>
-                            <Text className="text-xs font-bold text-gray-500">£{adminShare.toFixed(2)}</Text>
+                            <Text className="text-xs font-bold text-gray-500">£{platformFee.toFixed(2)}</Text>
                         </View>
                     </View>
 
