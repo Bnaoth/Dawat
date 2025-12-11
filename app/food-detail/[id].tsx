@@ -7,6 +7,7 @@ import Slider from '@react-native-community/slider';
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "../../store/store";
 import { createOrder } from "../../store/slices/ordersSlice";
+import { decreasePostQuantity } from "../../store/slices/feedSlice";
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -31,10 +32,11 @@ export default function FoodDetailScreen() {
     // Parse price (remove currency symbol)
     const numericPrice = parseFloat((price as string).replace('£', ''));
 
-    // Ensure maxQty is a valid number
+    // Parse available quantity from maxQuantity param (e.g., "10 Plates" -> 10)
     const DEFAULT_MAX = 10;
-    let parsedMax = parseInt(maxQuantity as string, 10);
-    const maxQty = isNaN(parsedMax) ? DEFAULT_MAX : parsedMax;
+    const maxQuantityStr = maxQuantity as string;
+    let parsedMax = parseInt(maxQuantityStr.replace(/[^0-9]/g, ''), 10);
+    const maxQty = isNaN(parsedMax) || parsedMax === 0 ? DEFAULT_MAX : parsedMax;
 
     const [quantity, setQuantity] = useState(1);
     const [ingredientsExpanded, setIngredientsExpanded] = useState(false);
@@ -61,6 +63,12 @@ export default function FoodDetailScreen() {
     const chefShare = Math.max(0, subtotal - platformFee); // Deducted from chef
 
     const handleCheckout = async () => {
+        // Validate quantity
+        if (quantity > maxQty) {
+            Alert.alert("Insufficient Stock", `Only ${maxQty} plates available. Please reduce your quantity.`);
+            return;
+        }
+
         try {
             const result = await dispatch(createOrder({
                 customerId: user.firstName || "customer_123",
@@ -73,6 +81,12 @@ export default function FoodDetailScreen() {
                 quantity,
                 pricePerItem: price as string,
             })).unwrap();
+
+            // Decrease post quantity (auto-deletes if 0)
+            dispatch(decreasePostQuantity({ 
+                postId: id as string, 
+                orderedQuantity: quantity 
+            }));
 
             // Show passcode modal with generated code
             setGeneratedPasscode(result.passcode);
@@ -179,21 +193,37 @@ export default function FoodDetailScreen() {
                     <View className="mb-8">
                         <View className="flex-row justify-between items-center mb-4">
                             <Text className="text-lg font-bold text-gray-800">Select Quantity</Text>
-                            <Text className="text-orange-600 font-bold text-xl">{quantity}</Text>
+                            <View className="flex-row items-center gap-2">
+                                <Text className="text-orange-600 font-bold text-xl">{quantity}</Text>
+                                {maxQty === 0 && (
+                                    <View className="bg-red-100 px-3 py-1 rounded-full">
+                                        <Text className="text-red-700 font-bold text-xs">SOLD OUT</Text>
+                                    </View>
+                                )}
+                            </View>
                         </View>
 
-                        <Slider
-                            style={{ width: '100%', height: 40 }}
-                            minimumValue={1}
-                            maximumValue={maxQty}
-                            step={1}
-                            value={quantity}
-                            onValueChange={setQuantity}
-                            minimumTrackTintColor="#EA580C"
-                            maximumTrackTintColor="#D1D5DB"
-                            thumbTintColor="#EA580C"
-                        />
-                        <Text className="text-center text-gray-400 text-xs mt-2">Available: {maxQty} portions</Text>
+                        {maxQty > 0 ? (
+                            <>
+                                <Slider
+                                    style={{ width: '100%', height: 40 }}
+                                    minimumValue={1}
+                                    maximumValue={maxQty}
+                                    step={1}
+                                    value={quantity}
+                                    onValueChange={setQuantity}
+                                    minimumTrackTintColor="#EA580C"
+                                    maximumTrackTintColor="#D1D5DB"
+                                    thumbTintColor="#EA580C"
+                                />
+                                <Text className="text-center text-gray-400 text-xs mt-2">Available: {maxQty} plates</Text>
+                            </>
+                        ) : (
+                            <View className="bg-gray-100 p-4 rounded-xl items-center">
+                                <Ionicons name="alert-circle-outline" size={32} color="#6B7280" />
+                                <Text className="text-gray-500 mt-2">This item is currently sold out</Text>
+                            </View>
+                        )}
                     </View>
 
                     {/* Bill Breakdown */}
@@ -229,11 +259,13 @@ export default function FoodDetailScreen() {
                     {/* Checkout Button */}
                     <TouchableOpacity
                         onPress={handleCheckout}
-                        disabled={loading}
-                        className={`w-full bg-orange-600 py-4 rounded-xl items-center shadow-md active:bg-orange-700 ${loading ? 'opacity-50' : ''}`}
+                        disabled={loading || maxQty === 0}
+                        className={`w-full py-4 rounded-xl items-center shadow-md ${
+                            maxQty === 0 ? 'bg-gray-300' : 'bg-orange-600 active:bg-orange-700'
+                        } ${loading ? 'opacity-50' : ''}`}
                     >
                         <Text className="text-white font-bold text-xl">
-                            {loading ? "Processing..." : `Checkout • £${totalAmount.toFixed(2)}`}
+                            {maxQty === 0 ? "Sold Out" : loading ? "Processing..." : `Checkout • £${totalAmount.toFixed(2)}`}
                         </Text>
                     </TouchableOpacity>
                 </View>

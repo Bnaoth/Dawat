@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from "@expo/vector-icons";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "../../store/store";
-import { addNewPost } from "../../store/slices/feedSlice";
+import { addNewPost, FOOD_CATEGORIES, FoodCategory } from "../../store/slices/feedSlice";
 import { geocodePostcode } from "../../utils/locationUtils";
 
 const QUANTITY_OPTIONS = Array.from({ length: 100 }, (_, i) => String(i + 1));
@@ -23,8 +23,9 @@ export default function UploadScreen() {
     const [quantity, setQuantity] = useState("1");
     const [price, setPrice] = useState("Free");
     const [geocodingLocation, setGeocodingLocation] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState<FoodCategory>(FOOD_CATEGORIES[0]);
 
-    // Manage which picker is open: 'quantity' | 'price' | null
+    // Manage which picker is open: 'quantity' | 'price' | 'category' | null
     const [activePicker, setActivePicker] = useState<string | null>(null);
 
     const pickImage = async () => {
@@ -64,7 +65,7 @@ export default function UploadScreen() {
             }
 
             await dispatch(addNewPost({
-                title: (params.category as string) || "Delicious Food",
+                title: selectedCategory || (params.category as string) || "Delicious Food",
                 chef: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : "Chef",
                 chefAvatar: user.avatar,
                 distance: "Calculating...",
@@ -74,6 +75,7 @@ export default function UploadScreen() {
                 quantity: `${quantity} Plates`, // appending unit for display
                 rating: 5.0,
                 location: user.address || user.location,
+                category: selectedCategory,
                 supplierId: user.firstName || "supplier_default",
                 supplierPostcode: user.postcode, // Store supplier's postcode
                 supplierLat: supplierLat, // Store geocoded lat
@@ -98,43 +100,61 @@ export default function UploadScreen() {
     const getPickerData = () => {
         if (activePicker === 'quantity') return QUANTITY_OPTIONS;
         if (activePicker === 'price') return PRICE_OPTIONS;
+        if (activePicker === 'category') return FOOD_CATEGORIES;
         return [];
     };
 
     const handleSelectOption = (item: string) => {
         if (activePicker === 'quantity') setQuantity(item);
         if (activePicker === 'price') setPrice(item);
+        if (activePicker === 'category') setSelectedCategory(item as FoodCategory);
         setActivePicker(null);
     };
 
     return (
         <View className="flex-1 bg-white p-4">
 
-            {/* Top Section: Quantity and Price Pickers */}
-            <View className="mb-8 mt-2 flex-row justify-between gap-4">
+            {/* Top Section: Category, Quantity and Price Pickers */}
+            <View className="mb-8 mt-2">
 
-                {/* Quantity Picker */}
-                <View className="flex-1">
-                    <Text className="text-lg font-bold text-gray-800 mb-2">Quantity</Text>
+                {/* Category Picker */}
+                <View className="mb-4">
+                    <Text className="text-lg font-bold text-gray-800 mb-2">Food Category</Text>
                     <TouchableOpacity
-                        onPress={() => setActivePicker('quantity')}
+                        onPress={() => setActivePicker('category')}
                         className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 flex-row justify-between items-center"
                     >
-                        <Text className="text-gray-900 text-lg">{quantity}</Text>
+                        <Text className="text-gray-900 text-lg">{selectedCategory}</Text>
                         <Ionicons name="chevron-down" size={20} color="gray" />
                     </TouchableOpacity>
                 </View>
 
-                {/* Price Picker */}
-                <View className="flex-1">
-                    <Text className="text-lg font-bold text-gray-800 mb-2">Price</Text>
-                    <TouchableOpacity
-                        onPress={() => setActivePicker('price')}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 flex-row justify-between items-center"
-                    >
-                        <Text className="text-gray-900 text-lg">{price}</Text>
-                        <Ionicons name="chevron-down" size={20} color="gray" />
-                    </TouchableOpacity>
+                {/* Quantity and Price Row */}
+                <View className="flex-row justify-between gap-4">
+
+                    {/* Quantity Picker */}
+                    <View className="flex-1">
+                        <Text className="text-lg font-bold text-gray-800 mb-2">Quantity</Text>
+                        <TouchableOpacity
+                            onPress={() => setActivePicker('quantity')}
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 flex-row justify-between items-center"
+                        >
+                            <Text className="text-gray-900 text-lg">{quantity}</Text>
+                            <Ionicons name="chevron-down" size={20} color="gray" />
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Price Picker */}
+                    <View className="flex-1">
+                        <Text className="text-lg font-bold text-gray-800 mb-2">Price</Text>
+                        <TouchableOpacity
+                            onPress={() => setActivePicker('price')}
+                            className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 flex-row justify-between items-center"
+                        >
+                            <Text className="text-gray-900 text-lg">{price}</Text>
+                            <Ionicons name="chevron-down" size={20} color="gray" />
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </View>
 

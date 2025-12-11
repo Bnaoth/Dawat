@@ -1,23 +1,32 @@
-import { View, Text, ScrollView, TouchableOpacity, Image, TextInput, Modal, Alert } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, Image, TextInput, Modal, Alert, FlatList } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../../store/store";
 import { updateOrderStatus, verifyPasscode, rateOrder, Order } from "../../store/slices/ordersSlice";
-import { updatePostRating } from "../../store/slices/feedSlice";
+import { updatePostRating, deletePost, updatePost, Post } from "../../store/slices/feedSlice";
 import { useState, useEffect } from "react";
 import RatingModal from "../../components/RatingModal";
+
+const QUANTITY_OPTIONS = Array.from({ length: 100 }, (_, i) => String(i + 1));
+const PRICE_OPTIONS = ["Free", ...Array.from({ length: 40 }, (_, i) => `£${(i + 1) * 0.50 ? ((i + 1) * 0.50).toFixed(2) : ""}`)];
 
 export default function KitchenScreen() {
     const router = useRouter();
     const dispatch = useDispatch<AppDispatch>();
     const user = useSelector((state: RootState) => state.user);
     const { orders } = useSelector((state: RootState) => state.orders);
+    const { posts } = useSelector((state: RootState) => state.feed);
     
     // Filter orders for current supplier
     const incomingOrders = orders.filter(order => 
         order.supplierId === (user.firstName || "supplier_default")
+    );
+
+    // Filter posts for current supplier
+    const myPosts = posts.filter(post =>
+        post.supplierId === (user.firstName || "supplier_default")
     );
 
     const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
@@ -25,6 +34,13 @@ export default function KitchenScreen() {
     const [showPasscodeModal, setShowPasscodeModal] = useState(false);
     const [showRatingModal, setShowRatingModal] = useState(false);
     const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
+    
+    // My Posts management
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [editingPost, setEditingPost] = useState<Post | null>(null);
+    const [editQuantity, setEditQuantity] = useState("1");
+    const [editPrice, setEditPrice] = useState("Free");
+    const [activePickerType, setActivePickerType] = useState<'quantity' | 'price' | null>(null);
 
     const handleMarkReady = async (orderId: string) => {
         try {
@@ -80,32 +96,141 @@ export default function KitchenScreen() {
         }
     };
 
+    const handleDeletePost = (postId: string, postTitle: string) => {
+        Alert.alert(
+            "Delete Post",
+            `Are you sure you want to delete "${postTitle}"?`,
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: () => {
+                        dispatch(deletePost(postId));
+                        Alert.alert("Deleted", "Post removed from feed");
+                    }
+                }
+            ]
+        );
+    };
+
+    const handleEditPost = (post: Post) => {
+        setEditingPost(post);
+        const qty = post.quantity?.replace(/[^0-9]/g, '') || "1";
+        setEditQuantity(qty);
+        setEditPrice(post.price);
+        setShowEditModal(true);
+    };
+
+    const handleSaveEdit = () => {
+        if (!editingPost) return;
+        
+        dispatch(updatePost({
+            postId: editingPost.id!,
+            quantity: `${editQuantity} Plates`,
+            price: editPrice
+        }));
+        
+        Alert.alert("Updated", "Your post has been updated!");
+        setShowEditModal(false);
+        setEditingPost(null);
+    };
+
+    const getPickerData = () => {
+        if (activePickerType === 'quantity') return QUANTITY_OPTIONS;
+        if (activePickerType === 'price') return PRICE_OPTIONS;
+        return [];
+    };
+
+    const handleSelectOption = (item: string) => {
+        if (activePickerType === 'quantity') setEditQuantity(item);
+        if (activePickerType === 'price') setEditPrice(item);
+        setActivePickerType(null);
+        setTimeout(() => setShowEditModal(true), 100);
+    };
+
     return (
-        <SafeAreaView className="flex-1 bg-gray-50 p-4">
-            <View className="flex-row justify-between items-center mb-6">
-                <Text className="text-2xl font-bold text-gray-900">My Kitchen</Text>
-                <TouchableOpacity className="bg-gray-200 p-2 rounded-full">
-                    <Ionicons name="settings-outline" size={24} color="black" />
-                </TouchableOpacity>
+        <SafeAreaView className="flex-1 bg-gray-50">
+            <View className="px-4 pt-4 pb-2">
+                <View className="flex-row justify-between items-center mb-6">
+                    <Text className="text-2xl font-bold text-gray-900">My Kitchen</Text>
+                    <TouchableOpacity className="bg-gray-200 p-2 rounded-full">
+                        <Ionicons name="settings-outline" size={24} color="black" />
+                    </TouchableOpacity>
+                </View>
             </View>
 
+            <ScrollView className="flex-1 px-4" showsVerticalScrollIndicator={false}>
             {/* Analytics Section */}
             <View className="bg-white p-4 rounded-2xl shadow-sm mb-6">
                 <Text className="text-lg font-bold text-gray-800 mb-4">Analytics</Text>
                 <View className="flex-row justify-between">
                     <View className="items-center flex-1 border-r border-gray-100">
-                        <Text className="text-3xl font-bold text-orange-600">12</Text>
+                        <Text className="text-3xl font-bold text-orange-600">{incomingOrders.length}</Text>
                         <Text className="text-gray-500 text-xs">Today's Orders</Text>
                     </View>
                     <View className="items-center flex-1 border-r border-gray-100">
-                        <Text className="text-3xl font-bold text-orange-600">£85</Text>
-                        <Text className="text-gray-500 text-xs">Earnings</Text>
+                        <Text className="text-3xl font-bold text-orange-600">{myPosts.length}</Text>
+                        <Text className="text-gray-500 text-xs">Active Posts</Text>
                     </View>
                     <View className="items-center flex-1">
-                        <Text className="text-3xl font-bold text-orange-600">48</Text>
-                        <Text className="text-gray-500 text-xs">Profile Views</Text>
+                        <Text className="text-3xl font-bold text-orange-600">{myPosts.reduce((sum, p) => sum + parseInt(p.quantity.replace(/[^0-9]/g, '') || '0'), 0)}</Text>
+                        <Text className="text-gray-500 text-xs">Total Items</Text>
                     </View>
                 </View>
+            </View>
+
+            {/* My Posts Section */}
+            <View className="mb-4">
+                <View className="flex-row justify-between items-center mb-4">
+                    <Text className="text-lg font-bold text-gray-800">My Posts ({myPosts.length})</Text>
+                </View>
+
+                {myPosts.length > 0 ? (
+                    myPosts.map((item) => (
+                        <View key={item.id} className="bg-white p-4 rounded-xl shadow-sm mb-3 border border-gray-100">
+                                <View className="flex-row justify-between items-start mb-2">
+                                    <View className="flex-1">
+                                        <Text className="text-base font-bold text-gray-900">{item.title}</Text>
+                                        <Text className="text-sm text-gray-500">{item.category}</Text>
+                                        <Text className="text-xs text-gray-400 mt-1">{item.postedAgo}</Text>
+                                    </View>
+                                    <View className="flex-row items-center gap-1">
+                                        <Ionicons name="star" size={14} color="#F59E0B" />
+                                        <Text className="text-sm font-bold text-gray-800">{item.rating.toFixed(1)}</Text>
+                                    </View>
+                                </View>
+
+                                <View className="flex-row justify-between items-center mb-3 pt-2 border-t border-gray-100">
+                                    <View>
+                                        <Text className="text-xs text-gray-500">Qty: {item.quantity}</Text>
+                                        <Text className="text-lg font-bold text-orange-600">{item.price}</Text>
+                                    </View>
+                                    <View className="flex-row gap-2">
+                                        <TouchableOpacity
+                                            onPress={() => handleEditPost(item)}
+                                            className="bg-blue-600 px-4 py-2 rounded-lg flex-row items-center gap-1"
+                                        >
+                                            <Ionicons name="pencil" size={14} color="white" />
+                                            <Text className="text-white font-semibold text-xs">Edit</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            onPress={() => handleDeletePost(item.id!, item.title)}
+                                            className="bg-red-600 px-4 py-2 rounded-lg flex-row items-center gap-1"
+                                        >
+                                            <Ionicons name="trash" size={14} color="white" />
+                                            <Text className="text-white font-semibold text-xs">Delete</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            </View>
+                        ))
+                ) : (
+                    <View className="border-2 border-dashed border-gray-300 rounded-xl p-6 items-center justify-center">
+                        <Ionicons name="document-outline" size={40} color="#9CA3AF" />
+                        <Text className="text-gray-400 text-center mt-3">No posts yet.{"\n"}Upload your first item!</Text>
+                    </View>
+                )}
             </View>
 
             {/* Active Menu Section */}
@@ -120,10 +245,9 @@ export default function KitchenScreen() {
                 </TouchableOpacity>
             </View>
 
-            <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-                {/* Incoming Orders */}
-                {incomingOrders.length > 0 ? (
-                    incomingOrders.map((order) => (
+            {/* Incoming Orders */}
+            {incomingOrders.length > 0 ? (
+                incomingOrders.map((order) => (
                         <View key={order.id} className="bg-white p-4 rounded-xl shadow-sm mb-3 border border-gray-100">
                             <View className="flex-row justify-between items-start mb-3">
                                 <View className="flex-1">
@@ -250,6 +374,103 @@ export default function KitchenScreen() {
                 orderTitle={completedOrder?.postTitle || "this order"}
                 recipientName={completedOrder?.customerName || "the customer"}
             />
+
+            {/* Edit Post Modal */}
+            <Modal
+                visible={showEditModal}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setShowEditModal(false)}
+            >
+                <View className="flex-1 bg-black/50 justify-end">
+                    <View className="bg-white rounded-t-3xl p-6 pb-10">
+                        <View className="flex-row justify-between items-center mb-6">
+                            <Text className="text-2xl font-bold text-gray-900">Edit Post</Text>
+                            <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                                <Ionicons name="close" size={28} color="#6B7280" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {editingPost && (
+                            <>
+                                <Text className="text-lg font-bold text-gray-800 mb-2">{editingPost.title}</Text>
+                                <Text className="text-gray-500 mb-6">{editingPost.category}</Text>
+
+                                {/* Quantity Picker */}
+                                <View className="mb-4">
+                                    <Text className="text-lg font-bold text-gray-800 mb-2">Quantity</Text>
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setShowEditModal(false);
+                                            setTimeout(() => setActivePickerType('quantity'), 100);
+                                        }}
+                                        className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 flex-row justify-between items-center"
+                                    >
+                                        <Text className="text-gray-900 text-lg">{editQuantity}</Text>
+                                        <Ionicons name="chevron-down" size={20} color="gray" />
+                                    </TouchableOpacity>
+                                </View>
+
+                                {/* Price Picker */}
+                                <View className="mb-6">
+                                    <Text className="text-lg font-bold text-gray-800 mb-2">Price</Text>
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setShowEditModal(false);
+                                            setTimeout(() => setActivePickerType('price'), 100);
+                                        }}
+                                        className="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 flex-row justify-between items-center"
+                                    >
+                                        <Text className="text-gray-900 text-lg">{editPrice}</Text>
+                                        <Ionicons name="chevron-down" size={20} color="gray" />
+                                    </TouchableOpacity>
+                                </View>
+
+                                <TouchableOpacity
+                                    onPress={handleSaveEdit}
+                                    className="bg-orange-600 py-4 rounded-xl items-center mb-3"
+                                >
+                                    <Text className="text-white font-bold text-lg">Save Changes</Text>
+                                </TouchableOpacity>
+                            </>
+                        )}
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Picker Modal */}
+            <Modal
+                visible={activePickerType !== null}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setActivePickerType(null)}
+            >
+                <View className="flex-1 bg-black/50 justify-end">
+                    <View className="bg-white rounded-t-3xl">
+                        <View className="flex-row justify-between items-center p-6 border-b border-gray-200">
+                            <Text className="text-lg font-bold text-gray-900">
+                                {activePickerType === 'quantity' ? 'Select Quantity' : 'Select Price'}
+                            </Text>
+                            <TouchableOpacity onPress={() => setActivePickerType(null)}>
+                                <Ionicons name="close" size={24} color="#6B7280" />
+                            </TouchableOpacity>
+                        </View>
+                        <FlatList
+                            data={getPickerData()}
+                            keyExtractor={(item) => item}
+                            renderItem={({ item }) => (
+                                <TouchableOpacity
+                                    onPress={() => handleSelectOption(item)}
+                                    className="p-4 border-b border-gray-100"
+                                >
+                                    <Text className="text-gray-900 text-lg">{item}</Text>
+                                </TouchableOpacity>
+                            )}
+                            style={{ maxHeight: 300 }}
+                        />
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }

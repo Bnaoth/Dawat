@@ -8,10 +8,11 @@ interface FoodCardProps {
     price: string;
     image?: any; // Supports require() or { uri: string }
     rating?: number;
+    postedAgo?: string;
     onPress: () => void;
 }
 
-export default function FoodCard({ title, chef, distance, price, image, rating = 4.8, onPress }: FoodCardProps) {
+export default function FoodCard({ title, chef, distance, price, image, rating = 4.8, postedAgo, onPress }: FoodCardProps) {
     // Determine the image source safely
     let source;
     if (image) {
@@ -47,9 +48,17 @@ export default function FoodCard({ title, chef, distance, price, image, rating =
                 </View>
 
                 <View className="flex-row items-center justify-between mt-3 pt-3 border-t border-gray-100">
-                    <View className="flex-row items-center gap-1">
-                        <Ionicons name="location-outline" size={16} color="#6B7280" />
-                        <Text className="text-xs text-gray-500">{distance} away</Text>
+                    <View className="flex-row items-center gap-3">
+                        <View className="flex-row items-center gap-1">
+                            <Ionicons name="location-outline" size={16} color="#6B7280" />
+                            <Text className="text-xs text-gray-500">{distance} away</Text>
+                        </View>
+                        {postedAgo && (
+                            <View className="flex-row items-center gap-1">
+                                <Ionicons name="time-outline" size={16} color="#6B7280" />
+                                <Text className="text-xs text-gray-500">{postedAgo}</Text>
+                            </View>
+                        )}
                     </View>
                     <TouchableOpacity className="bg-orange-600 px-4 py-2 rounded-full">
                         <Text className="text-white text-xs font-bold">Grab It</Text>

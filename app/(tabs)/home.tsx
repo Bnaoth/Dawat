@@ -1,4 +1,4 @@
-import { View, Text, FlatList, TouchableOpacity, RefreshControl, Alert } from "react-native";
+import { View, Text, FlatList, TouchableOpacity, RefreshControl, Alert, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -6,12 +6,27 @@ import FoodCard from "../../components/FoodCard";
 import { useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../../store/store";
-import { fetchPosts, Post } from "../../store/slices/feedSlice";
+import { fetchPosts, Post, FOOD_CATEGORIES, FoodCategory } from "../../store/slices/feedSlice";
 import { setUserLocation } from "../../store/slices/userSlice";
 import * as Location from "expo-location";
 import { calculateDistance, geocodePostcode, formatDistance } from "../../utils/locationUtils";
 
 type FilterType = 'nearest' | 'topRated' | 'bestValue';
+
+const formatPostedAgo = (createdAt?: number) => {
+    if (!createdAt) return '';
+    const diffMs = Date.now() - createdAt;
+    const diffHours = Math.max(0, diffMs / (1000 * 60 * 60));
+    if (diffHours < 1) {
+        const mins = Math.max(1, Math.floor(diffMs / (1000 * 60)));
+        return `${mins}m ago`;
+    }
+    if (diffHours < 24) {
+        return `${Math.floor(diffHours)}h ago`;
+    }
+    const days = Math.floor(diffHours / 24);
+    return `${days}d ago`;
+};
 
 export default function HomeScreen() {
     const router = useRouter();
@@ -21,6 +36,7 @@ export default function HomeScreen() {
     const [postsWithDistance, setPostsWithDistance] = useState<Post[]>([]);
     const [activeFilter, setActiveFilter] = useState<FilterType>('nearest');
     const [refreshing, setRefreshing] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState<FoodCategory | 'All'>('All');
 
     // Request location permission and get user's current location on mount
     useEffect(() => {
@@ -71,11 +87,15 @@ export default function HomeScreen() {
                         return {
                             ...post,
                             distance: formatDistance(distance),
+                            postedAgo: formatPostedAgo(post.createdAt),
                         };
                     }
 
-                    // If no supplier coords, keep original distance
-                    return post;
+                    // If no supplier coords, still attach postedAgo
+                    return {
+                        ...post,
+                        postedAgo: formatPostedAgo(post.createdAt),
+                    };
                 } catch (error) {
                     console.error("Distance calculation error:", error);
                     return post;
@@ -89,22 +109,24 @@ export default function HomeScreen() {
     }, [posts, locationLoaded, userLat, userLng]);
 
     // Sort posts based on active filter
-    const sortedPosts = [...postsWithDistance].sort((a, b) => {
-        if (activeFilter === 'nearest') {
-            const distA = parseFloat(a.distance.replace(/[^0-9.]/g, '')) || 999;
-            const distB = parseFloat(b.distance.replace(/[^0-9.]/g, '')) || 999;
-            return distA - distB;
-        } else if (activeFilter === 'topRated') {
-            return b.rating - a.rating;
-        } else {
-            // bestValue: combination of low distance + high rating
-            const distA = parseFloat(a.distance.replace(/[^0-9.]/g, '')) || 999;
-            const distB = parseFloat(b.distance.replace(/[^0-9.]/g, '')) || 999;
-            const scoreA = a.rating * 2 - distA;
-            const scoreB = b.rating * 2 - distB;
-            return scoreB - scoreA;
-        }
-    });
+    const sortedPosts = [...postsWithDistance]
+        .filter(post => selectedCategory === 'All' || post.category === selectedCategory)
+        .sort((a, b) => {
+            if (activeFilter === 'nearest') {
+                const distA = parseFloat(a.distance.replace(/[^0-9.]/g, '')) || 999;
+                const distB = parseFloat(b.distance.replace(/[^0-9.]/g, '')) || 999;
+                return distA - distB;
+            } else if (activeFilter === 'topRated') {
+                return b.rating - a.rating;
+            } else {
+                // bestValue: combination of low distance + high rating
+                const distA = parseFloat(a.distance.replace(/[^0-9.]/g, '')) || 999;
+                const distB = parseFloat(b.distance.replace(/[^0-9.]/g, '')) || 999;
+                const scoreA = a.rating * 2 - distA;
+                const scoreB = b.rating * 2 - distB;
+                return scoreB - scoreA;
+            }
+        });
 
     // useEffect(() => {
     //     dispatch(fetchPosts());
@@ -147,6 +169,19 @@ export default function HomeScreen() {
         </TouchableOpacity>
     );
 
+    const CategoryChip = ({ label, value }: { label: string; value: FoodCategory | 'All' }) => (
+        <TouchableOpacity
+            onPress={() => setSelectedCategory(value)}
+            className={`px-4 py-2 rounded-full mr-2 ${
+                selectedCategory === value ? 'bg-blue-600' : 'bg-white border border-gray-200'
+            }`}
+        >
+            <Text className={`font-semibold text-sm ${selectedCategory === value ? 'text-white' : 'text-gray-700'}`}>
+                {label}
+            </Text>
+        </TouchableOpacity>
+    );
+
     return (
         <SafeAreaView className="flex-1 bg-gray-50 p-4 pb-0">
             <View className="flex-row justify-between items-center mb-6">
@@ -180,6 +215,17 @@ export default function HomeScreen() {
                 </View>
             </View>
 
+            {/* Category Filter Chips */}
+            <View className="mb-4">
+                <Text className="text-sm font-semibold text-gray-600 mb-2">Food Type</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <CategoryChip label="All" value="All" />
+                    {FOOD_CATEGORIES.map((category) => (
+                        <CategoryChip key={category} label={category} value={category} />
+                    ))}
+                </ScrollView>
+            </View>
+
             <FlatList
                 data={sortedPosts}
                 keyExtractor={(item) => item.id || Math.random().toString()}
@@ -199,6 +245,7 @@ export default function HomeScreen() {
                         price={item.price}
                         image={item.image}
                         rating={item.rating}
+                        postedAgo={item.postedAgo}
                         onPress={() => {
                             router.push({
                                 pathname: "/food-detail/[id]",

@@ -5,6 +5,9 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { signInAnonymously } from 'firebase/auth';
 
 // Types
+export const FOOD_CATEGORIES = ['Chicken', 'Mutton', 'Prawns', 'Fish', 'Other'] as const;
+export type FoodCategory = typeof FOOD_CATEGORIES[number];
+
 export interface Post {
     id?: string;
     title: string;
@@ -17,7 +20,9 @@ export interface Post {
     quantity: string;
     rating: number;
     location: string;
+    category?: FoodCategory;
     ingredients?: string[];
+    postedAgo?: string;
     // Supplier location data
     supplierId?: string;
     supplierPostcode?: string;
@@ -43,8 +48,8 @@ export const fetchPosts = createAsyncThunk('feed/fetchPosts', async () => {
     const q = query(collection(db, 'posts'), orderBy('createdAt', 'desc'));
     const querySnapshot = await getDocs(q);
     
-    // Filter threshold: 5 hours (average of 4-6 hours)
-    const HOURS_THRESHOLD = 5;
+    // Filter threshold: 4 hours (freshness cutoff)
+    const HOURS_THRESHOLD = 4;
     const now = Date.now();
     const thresholdTime = now - (HOURS_THRESHOLD * 60 * 60 * 1000);
     
@@ -90,6 +95,7 @@ export const addNewPost = createAsyncThunk(
             quantity: postData.quantity,
             rating: 5.0,
             location: postData.location,
+            category: (postData as any).category,
             supplierId: (postData as any).supplierId,
             supplierPostcode: postData.supplierPostcode,
             supplierLat: postData.supplierLat,
@@ -115,6 +121,30 @@ export const feedSlice = createSlice({
                 post.rating = action.payload.newRating;
             }
         },
+        deletePost: (state, action: PayloadAction<string>) => {
+            state.posts = state.posts.filter(post => post.id !== action.payload);
+        },
+        updatePost: (state, action: PayloadAction<{ postId: string; quantity: string; price: string }>) => {
+            const post = state.posts.find(p => p.id === action.payload.postId);
+            if (post) {
+                post.quantity = action.payload.quantity;
+                post.price = action.payload.price;
+            }
+        },
+        decreasePostQuantity: (state, action: PayloadAction<{ postId: string; orderedQuantity: number }>) => {
+            const post = state.posts.find(p => p.id === action.payload.postId);
+            if (post) {
+                const currentQty = parseInt(post.quantity.replace(/[^0-9]/g, '') || '0');
+                const newQty = Math.max(0, currentQty - action.payload.orderedQuantity);
+                
+                if (newQty === 0) {
+                    // Auto-delete post when sold out
+                    state.posts = state.posts.filter(p => p.id !== action.payload.postId);
+                } else {
+                    post.quantity = `${newQty} Plates`;
+                }
+            }
+        },
     },
     extraReducers: (builder) => {
         builder
@@ -125,8 +155,8 @@ export const feedSlice = createSlice({
             .addCase(fetchPosts.fulfilled, (state, action) => {
                 state.loading = false;
                 
-                // Filter threshold: 5 hours
-                const HOURS_THRESHOLD = 5;
+                // Filter threshold: 4 hours
+                const HOURS_THRESHOLD = 4;
                 const now = Date.now();
                 const thresholdTime = now - (HOURS_THRESHOLD * 60 * 60 * 1000);
                 
@@ -167,6 +197,6 @@ export const feedSlice = createSlice({
     },
 });
 
-export const { updatePostRating } = feedSlice.actions;
+export const { updatePostRating, deletePost, updatePost, decreasePostQuantity } = feedSlice.actions;
 
 export default feedSlice.reducer;
