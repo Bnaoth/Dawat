@@ -29,6 +29,10 @@ export interface Post {
     supplierLat?: number;
     supplierLng?: number;
     createdAt?: number; // serialized timestamp
+    // Supplier metrics
+    supplierRating?: number;
+    avgResponseTime?: number; // in minutes
+    isFavorite?: boolean;
 }
 
 interface FeedState {
@@ -124,6 +128,17 @@ export const feedSlice = createSlice({
         deletePost: (state, action: PayloadAction<string>) => {
             state.posts = state.posts.filter(post => post.id !== action.payload);
         },
+        repostPost: (state, action: PayloadAction<{ post: Post; quantity: string; price: string }>) => {
+            const { post, quantity, price } = action.payload;
+            const newPost: Post = {
+                ...post,
+                id: `repost_${Date.now()}`,
+                quantity,
+                price,
+                createdAt: Date.now(),
+            };
+            state.posts.unshift(newPost);
+        },
         updatePost: (state, action: PayloadAction<{ postId: string; quantity: string; price: string }>) => {
             const post = state.posts.find(p => p.id === action.payload.postId);
             if (post) {
@@ -143,6 +158,12 @@ export const feedSlice = createSlice({
                 } else {
                     post.quantity = `${newQty} Plates`;
                 }
+            }
+        },
+        toggleFavorite: (state, action: PayloadAction<string>) => {
+            const post = state.posts.find(p => p.id === action.payload);
+            if (post) {
+                post.isFavorite = !post.isFavorite;
             }
         },
     },
@@ -197,6 +218,6 @@ export const feedSlice = createSlice({
     },
 });
 
-export const { updatePostRating, deletePost, updatePost, decreasePostQuantity } = feedSlice.actions;
+export const { updatePostRating, deletePost, updatePost, decreasePostQuantity, toggleFavorite, repostPost } = feedSlice.actions;
 
 export default feedSlice.reducer;

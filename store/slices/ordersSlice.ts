@@ -22,6 +22,7 @@ export interface Order {
     createdAt: number;
     readyAt?: number;
     completedAt?: number;
+    etaMinutes?: number;
     customerRating?: number;
     customerReview?: string;
     supplierRating?: number;
@@ -102,17 +103,17 @@ export const createOrder = createAsyncThunk(
 // Update order status
 export const updateOrderStatus = createAsyncThunk(
     'orders/updateStatus',
-    async ({ orderId, status }: { orderId: string; status: OrderStatus }) => {
+    async ({ orderId, status, etaMinutes }: { orderId: string; status: OrderStatus; etaMinutes?: number }) => {
         const timestamp = Date.now();
         
         // Update in Firestore
         // await updateDoc(doc(db, 'orders', orderId), {
         //     status,
-        //     ...(status === 'ready' && { readyAt: timestamp }),
+        //     ...(status === 'ready' && { readyAt: timestamp, etaMinutes }),
         //     ...(status === 'completed' && { completedAt: timestamp }),
         // });
 
-        return { orderId, status, timestamp };
+        return { orderId, status, timestamp, etaMinutes };
     }
 );
 
@@ -199,11 +200,14 @@ export const ordersSlice = createSlice({
             })
             // Update Order Status
             .addCase(updateOrderStatus.fulfilled, (state, action) => {
-                const { orderId, status, timestamp } = action.payload;
+                const { orderId, status, timestamp, etaMinutes } = action.payload;
                 const order = state.orders.find(o => o.orderId === orderId);
                 if (order) {
                     order.status = status;
-                    if (status === 'ready') order.readyAt = timestamp;
+                    if (status === 'ready') {
+                        order.readyAt = timestamp;
+                        if (etaMinutes !== undefined) order.etaMinutes = etaMinutes;
+                    }
                     if (status === 'completed') order.completedAt = timestamp;
                 }
             })

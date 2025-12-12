@@ -19,6 +19,7 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
+    "scheme": "dawat",
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -38,7 +39,11 @@
       "router": {},
       "eas": {
         "projectId": "bf0684ab-caed-44a4-922a-75daae48a5b5"
-      }
+      },
+      "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "115934389920-3mc1cbid6tpvog61qkj1ebv08s8g3j4k.apps.googleusercontent.com",
+      "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "115934389920-gobih3araha1nispsljspmhak2b7js0l.apps.googleusercontent.com",
+      "EXPO_PUBLIC_OAUTH_REDIRECT_SIGNIN": "exp://127.0.0.1:19000/--/oauthredirect",
+      "EXPO_PUBLIC_OAUTH_REDIRECT_SIGNOUT": "exp://127.0.0.1:19000/--/oauthredirect"
     },
     "owner": "banothganeshs-organization"
   }

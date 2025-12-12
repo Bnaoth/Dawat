@@ -119,37 +119,29 @@ export default function RegisterScreen() {
         setLoading(true);
 
         try {
-            // Create Firebase Auth user
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
 
-            // Create user profile in Firestore
             await setDoc(doc(db, "users", user.uid), {
-                email: email,
-                firstName: firstName,
-                lastName: lastName,
+                email,
+                firstName,
+                lastName,
                 fullName: `${firstName} ${lastName}`,
-                address: address,
-                city: city,
-                county: county,
-                postcode: postcode,
-                mobileNumber: mobileNumber,
+                address,
+                city,
+                county,
+                postcode,
+                mobileNumber,
                 createdAt: new Date().toISOString(),
                 uid: user.uid,
             });
 
             Alert.alert("Success", "Account created! Please log in to continue.", [
-                {
-                    text: "OK",
-                    onPress: () => {
-                        router.replace("/(auth)/login");
-                    },
-                },
+                { text: "OK", onPress: () => router.replace("/(auth)/login") }
             ]);
         } catch (error: any) {
             console.error("Registration error:", error);
             let errorMessage = "Registration failed. Please try again.";
-
             if (error.code === "auth/email-already-in-use") {
                 errorMessage = "This email is already registered.";
             } else if (error.code === "auth/weak-password") {
@@ -278,6 +270,8 @@ export default function RegisterScreen() {
                             </View>
                         )}
                     </View>
+
+                    {/* OTP Section removed for Firebase flow */}
 
                     {/* Postcode Section (manual entry) */}
                     <View className="mb-8">

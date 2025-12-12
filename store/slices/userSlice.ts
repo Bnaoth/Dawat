@@ -16,6 +16,8 @@ interface UserState {
     userLat: number | null;
     userLng: number | null;
     locationLoaded: boolean;
+    // Preferences
+    enableOrderNotifications: boolean;
 }
 
 const initialState: UserState = {
@@ -31,6 +33,7 @@ const initialState: UserState = {
     userLat: null,
     userLng: null,
     locationLoaded: false,
+    enableOrderNotifications: true,
 };
 
 export const userSlice = createSlice({
@@ -63,9 +66,12 @@ export const userSlice = createSlice({
             state.userLng = action.payload.lng;
             state.locationLoaded = true;
         },
+        toggleNotifications: (state) => {
+            state.enableOrderNotifications = !state.enableOrderNotifications;
+        },
     },
 });
 
-export const { setUser, updateLocation, setUserAddress, setUserLocation } = userSlice.actions;
+export const { setUser, updateLocation, setUserAddress, setUserLocation, toggleNotifications } = userSlice.actions;
 
 export default userSlice.reducer;

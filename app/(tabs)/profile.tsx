@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../../store/store";
 import { rateOrder, Order } from "../../store/slices/ordersSlice";
-import { updatePostRating } from "../../store/slices/feedSlice";
+import { updatePostRating, toggleFavorite } from "../../store/slices/feedSlice";
 import { useState } from "react";
 import RatingModal from "../../components/RatingModal";
 
@@ -24,6 +24,7 @@ export default function ProfileScreen() {
     
     const completedOrders = myOrders.filter(order => order.status === 'completed');
     const unratedOrders = completedOrders.filter(order => !order.customerRating);
+    const favoritePost = posts.find(p => p.isFavorite);
 
     const handleRateOrder = (order: Order) => {
         setSelectedOrder(order);
@@ -78,6 +79,45 @@ export default function ProfileScreen() {
             </View>
 
             <ScrollView className="p-4">
+                {/* Favorites Section */}
+                {posts.filter(p => p.isFavorite).length > 0 && (
+                    <View className="mb-6">
+                        <Text className="text-lg font-bold text-gray-900 mb-3">Saved Favorites ({posts.filter(p => p.isFavorite).length})</Text>
+                        {posts.filter(p => p.isFavorite).map((post) => (
+                            <View key={post.id} className="bg-white p-4 rounded-xl shadow-sm mb-3 border border-red-100">
+                                <View className="flex-row justify-between items-start mb-2">
+                                    <View className="flex-1">
+                                        <View className="flex-row items-center gap-2">
+                                            <Text className="text-base font-bold text-gray-900">{post.title}</Text>
+                                            <Ionicons name="heart" size={14} color="#EF4444" />
+                                        </View>
+                                        <Text className="text-sm text-gray-500">by {post.chef}</Text>
+                                    </View>
+                                    <Text className="text-lg font-bold text-orange-600">{post.price}</Text>
+                                </View>
+                                <View className="flex-row gap-2 mt-3">
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            // Quick reorder: navigate to order with preset quantity
+                                            // For now, just show alert
+                                        }}
+                                        className="flex-1 bg-orange-600 py-2 rounded-lg items-center"
+                                    >
+                                        <Text className="text-white font-semibold text-xs">Quick Reorder</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        onPress={() => post.id && dispatch(toggleFavorite(post.id))}
+                                        className="bg-red-100 px-3 py-2 rounded-lg"
+                                    >
+                                        <Ionicons name="heart" size={16} color="#EF4444" />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        ))}
+                    </View>
+                )}
+
+                {/* iew className="p-4">
                 {/* Orders Section */}
                 {myOrders.length > 0 && (
                     <View className="mb-6">

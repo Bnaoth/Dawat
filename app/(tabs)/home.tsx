@@ -6,7 +6,7 @@ import FoodCard from "../../components/FoodCard";
 import { useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../../store/store";
-import { fetchPosts, Post, FOOD_CATEGORIES, FoodCategory } from "../../store/slices/feedSlice";
+import { fetchPosts, Post, FOOD_CATEGORIES, FoodCategory, toggleFavorite } from "../../store/slices/feedSlice";
 import { setUserLocation } from "../../store/slices/userSlice";
 import * as Location from "expo-location";
 import { calculateDistance, geocodePostcode, formatDistance } from "../../utils/locationUtils";
@@ -32,11 +32,39 @@ export default function HomeScreen() {
     const router = useRouter();
     const dispatch = useDispatch<AppDispatch>();
     const { posts, loading } = useSelector((state: RootState) => state.feed);
+    const { orders } = useSelector((state: RootState) => state.orders);
     const { location, userLat, userLng, locationLoaded } = useSelector((state: RootState) => state.user);
     const [postsWithDistance, setPostsWithDistance] = useState<Post[]>([]);
     const [activeFilter, setActiveFilter] = useState<FilterType>('nearest');
     const [refreshing, setRefreshing] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState<FoodCategory | 'All'>('All');
+
+    // Calculate supplier metrics
+    const getSupplierMetrics = (supplierId?: string) => {
+        if (!supplierId) return { rating: undefined, avgResponseTime: undefined };
+        
+        const supplierOrders = orders.filter(o => o.supplierId === supplierId);
+        const completedOrders = supplierOrders.filter(o => o.status === 'completed');
+        
+        let supplierRating = undefined;
+        let avgResponseTime = undefined;
+        
+        if (completedOrders.length > 0) {
+            const ratings = completedOrders.filter(o => o.supplierRating !== undefined).map(o => o.supplierRating || 0);
+            if (ratings.length > 0) {
+                supplierRating = ratings.reduce((a, b) => a + b, 0) / ratings.length;
+            }
+            
+            const responseTimes = completedOrders
+                .filter(o => o.readyAt && o.createdAt)
+                .map(o => (o.readyAt! - o.createdAt) / (1000 * 60)); // minutes
+            if (responseTimes.length > 0) {
+                avgResponseTime = Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length);
+            }
+        }
+        
+        return { rating: supplierRating, avgResponseTime };
+    };
 
     // Request location permission and get user's current location on mount
     useEffect(() => {
@@ -246,6 +274,9 @@ export default function HomeScreen() {
                         image={item.image}
                         rating={item.rating}
                         postedAgo={item.postedAgo}
+                        isFavorite={item.isFavorite}
+                        supplierRating={getSupplierMetrics(item.supplierId).rating}
+                        avgResponseTime={getSupplierMetrics(item.supplierId).avgResponseTime}
                         onPress={() => {
                             router.push({
                                 pathname: "/food-detail/[id]",
@@ -261,6 +292,11 @@ export default function HomeScreen() {
                                     supplierId: item.supplierId || "supplier_default"
                                 }
                             });
+                        }}
+                        onFavoriteToggle={() => {
+                            if (item.id) {
+                                dispatch(toggleFavorite(item.id));
+                            }
                         }}
                     />
                 )}

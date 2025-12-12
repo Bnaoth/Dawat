@@ -9,10 +9,14 @@ interface FoodCardProps {
     image?: any; // Supports require() or { uri: string }
     rating?: number;
     postedAgo?: string;
+    supplierRating?: number;
+    avgResponseTime?: number;
+    isFavorite?: boolean;
     onPress: () => void;
+    onFavoriteToggle?: () => void;
 }
 
-export default function FoodCard({ title, chef, distance, price, image, rating = 4.8, postedAgo, onPress }: FoodCardProps) {
+export default function FoodCard({ title, chef, distance, price, image, rating = 4.8, postedAgo, supplierRating, avgResponseTime, isFavorite, onPress, onFavoriteToggle }: FoodCardProps) {
     // Determine the image source safely
     let source;
     if (image) {
@@ -36,6 +40,11 @@ export default function FoodCard({ title, chef, distance, price, image, rating =
                     <Ionicons name="star" size={14} color="#F59E0B" />
                     <Text className="text-xs font-bold text-gray-800">{rating}</Text>
                 </View>
+                {isFavorite && (
+                    <View className="absolute top-3 left-3 bg-red-500 p-2 rounded-full">
+                        <Ionicons name="heart" size={16} color="white" />
+                    </View>
+                )}
             </View>
 
             <View className="p-4">
@@ -44,8 +53,27 @@ export default function FoodCard({ title, chef, distance, price, image, rating =
                         <Text className="text-lg font-bold text-gray-900 leading-tight">{title}</Text>
                         <Text className="text-sm text-gray-500 font-medium">by {chef}</Text>
                     </View>
-                    <Text className="text-lg font-bold text-orange-600">{price}</Text>
+                    <TouchableOpacity onPress={onFavoriteToggle} className="ml-2">
+                        <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={20} color={isFavorite ? "#EF4444" : "#9CA3AF"} />
+                    </TouchableOpacity>
                 </View>
+
+                {(supplierRating !== undefined || avgResponseTime !== undefined) && (
+                    <View className="flex-row items-center gap-2 mb-2">
+                        {supplierRating !== undefined && (
+                            <View className="flex-row items-center gap-1 bg-blue-50 px-2 py-1 rounded">
+                                <Ionicons name="star" size={12} color="#3B82F6" />
+                                <Text className="text-xs font-semibold text-blue-700">{supplierRating.toFixed(1)}</Text>
+                            </View>
+                        )}
+                        {avgResponseTime !== undefined && (
+                            <View className="flex-row items-center gap-1 bg-green-50 px-2 py-1 rounded">
+                                <Ionicons name="time" size={12} color="#16A34A" />
+                                <Text className="text-xs font-semibold text-green-700">{avgResponseTime}m</Text>
+                            </View>
+                        )}
+                    </View>
+                )}
 
                 <View className="flex-row items-center justify-between mt-3 pt-3 border-t border-gray-100">
                     <View className="flex-row items-center gap-3">
